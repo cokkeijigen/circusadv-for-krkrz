@@ -25,6 +25,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 set(KR2ANDROID_DIR "${CMAKE_CURRENT_LIST_DIR}/kr2android")
 if(NOT EXISTS "${KR2ANDROID_DIR}/CMakeLists.txt")
+    include(FetchContent)
     FetchContent_Declare(
             kr2android
             GIT_REPOSITORY https://github.com/cokkeijigen/Kirikiroid2.git
@@ -60,7 +61,11 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         ZLIB::ZLIB
 )
 
-target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
         src
         src/utils
+)
+
+target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
+        -Wno-braced-scalar-init
 )
