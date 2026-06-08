@@ -50,12 +50,12 @@ namespace circusadv
 
     auto tTVPGraphicType::GetGlobal() -> tTVPGraphicType*
     {
-        const auto modbase{ k2a::get_base() };
-        if(modbase.ptr == nullptr)
+        static tTVPGraphicType* _ptr = nullptr;
+        if(_ptr == nullptr)
         {
-            return nullptr;
+            _ptr = k2a::cast_ptr<tTVPGraphicType*>(0x1AD84B8);
         }
-        return reinterpret_cast<tTVPGraphicType*>(modbase.uintptr + 0x1AD84B8);
+        return _ptr;
     }
 
     static void TVPLoadCRX(void* formatdata, void *callbackdata,  tTVPGraphicSizeCallback sizecallback,
