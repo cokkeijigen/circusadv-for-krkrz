@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Kirikiroid2Patch"
+rootProject.name = "circusadv-k2a-android"
 include(":app")
