@@ -28,12 +28,6 @@ android {
                     abiFilters.addAll(setOf("arm64-v8a"))
                 }
             }
-            ndk {
-                abiFilters.addAll(setOf("arm64-v8a"))
-            }
-        }
-        ndk {
-            abiFilters.addAll(setOf("arm64-v8a"))
         }
     }
 
@@ -66,6 +60,42 @@ android {
         viewBinding = true
     }
     ndkVersion = "28.2.13676358"
+
+
+    tasks.register("compile_jni_release") {
+        group = "build"
+
+        val stripReleaseTask = tasks.named("stripReleaseDebugSymbols")
+        dependsOn(stripReleaseTask)
+        doLast {
+            val stripOutDir = stripReleaseTask.get().outputs.files.files.firstOrNull()
+            if (stripOutDir?.exists() == true) {
+                val targetDir = file("${project.layout.buildDirectory.get()}/outputs/libs/release")
+                stripOutDir.resolve("lib").copyRecursively(targetDir, overwrite = true)
+            }
+        }
+    }
+
+    tasks.register("compile_jni_debug") {
+        group = "build"
+
+        val stripDebugTask = tasks.named("stripDebugDebugSymbols")
+        dependsOn(stripDebugTask)
+        doLast {
+            val stripOutDir = stripDebugTask.get().outputs.files.files.firstOrNull()
+            if (stripOutDir?.exists() == true) {
+                val targetDir = file("${project.layout.buildDirectory.get()}/outputs/libs/debug")
+                stripOutDir.resolve("lib").copyRecursively(targetDir, overwrite = true)
+            }
+        }
+    }
+
+    tasks.register("compile_jni_all")
+    {
+        group = "build"
+        dependsOn(tasks.named("compile_jni_release"))
+        dependsOn(tasks.named("compile_jni_debug"))
+    }
 }
 
 dependencies {
