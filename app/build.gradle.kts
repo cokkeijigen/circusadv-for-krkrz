@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "ss.colytitse.kr2patch"
-        minSdk = 29
+        minSdk = 21
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
