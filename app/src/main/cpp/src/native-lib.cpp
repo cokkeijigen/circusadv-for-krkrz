@@ -4,66 +4,10 @@
 namespace circusadv
 {
 
-    bool tTVPGraphicHandlerType::operator==(const tTVPGraphicHandlerType & ref) const
-    {
-        return this->FormatData == ref.FormatData &&
-               this->IsPlugin == ref.IsPlugin &&
-               this->LoadHandler == ref.LoadHandler &&
-               this->HeaderHandler == ref.HeaderHandler &&
-               this->SaveHandler == ref.SaveHandler &&
-               this->AcceptHandler == ref.AcceptHandler &&
-               this->Extension == ref.Extension;
-    }
-
-    void tTVPGraphicType::ReCreateHash()
-    {
-        std::vector<tTVPGraphicHandlerType>::iterator i;
-        for(i = this->Handlers.begin();
-            i!= this->Handlers.end(); i++)
-        {
-            this->Hash.Add(i->Extension, *i);
-        }
-    }
-
-    void tTVPGraphicType::Register(const tTVPGraphicHandlerType& hander )
-    {
-        this->Handlers.push_back(hander);
-        this->ReCreateHash();
-    }
-
-    void tTVPGraphicType::Unregister( const tTVPGraphicHandlerType& hander )
-    {
-        std::vector<tTVPGraphicHandlerType>::iterator i;
-        if(this->Handlers.size() > 0)
-        {
-            for(i = this->Handlers.begin(); i != this->Handlers.end(); i++)
-            {
-                if(hander == *i)
-                {
-                    this->Handlers.erase(i);
-                    break;
-                }
-            }
-        }
-        this->ReCreateHash();
-    }
-
-    auto tTVPGraphicType::GetGlobal() -> tTVPGraphicType*
-    {
-        static tTVPGraphicType* _ptr = nullptr;
-        if(_ptr == nullptr)
-        {
-            _ptr = k2a::cast_ptr<tTVPGraphicType*>(0x1AD84B8);
-        }
-        return _ptr;
-    }
-
-    static void TVPLoadCRX(void* formatdata, void *callbackdata,  tTVPGraphicSizeCallback sizecallback,
-           tTVPGraphicScanLineCallback scanlinecallback, tTVPMetaInfoPushCallback metainfopushcallback,
-           tTJSBinaryStream *src, tjs_int keyidx, tTVPGraphicLoadMode mode)
+    static auto TVPLoadCRX(const TVP::Graphic::GraphicLoadingContext& context) noexcept -> void
     {
         std::vector<uint8_t> buffer{};
-        auto size = src->GetSize();
+        auto size = context.src->GetSize();
         if(size ==0)
         {
             LOGD("无法获取文件大小");
@@ -72,7 +16,7 @@ namespace circusadv
 
         buffer.resize(size);
 
-        if(src->Read(buffer.data(), size) != size)
+        if(context.src->Read(buffer.data(), size) != size)
         {
             LOGD("无法读取文件");
             return;
@@ -84,9 +28,9 @@ namespace circusadv
         }
         const int w{ crx.width()  };
         const int h{ crx.height() };
-        sizecallback(callbackdata, w, h, gpfRGBA);
+        context.sizecallback(w, h, TVP::Graphic::gpfRGBA);
 
-        if (mode == glmPalettized && crx.bpp() == 1)  // Palettized mode: pass raw indexed data
+        if (context.mode == TVP::Graphic::glmPalettized && crx.bpp() == 1)  // Palettized mode: pass raw indexed data
         {
             std::vector<uint8_t> raw{};
             if (!crx.unpack(raw))
@@ -97,18 +41,18 @@ namespace circusadv
             const int src_stride{ crx.stride() };
             for (int y{}; y < h; ++y)
             {
-                void* scanline{ scanlinecallback(callbackdata, y) };
+                void* scanline{ context.scanlinecallback(y) };
                 if (scanline == nullptr)
                 {
                     break;
                 }
                 std::memcpy(scanline, raw.data() + y * src_stride, w);
             }
-            scanlinecallback(callbackdata, -1);
+            context.scanlinecallback(-1);
             return;
         }
 
-        else if (mode == glmGrayscale && crx.bpp() == 1) // Grayscale mode: convert palette to luminance
+        else if (context.mode == TVP::Graphic::glmGrayscale && crx.bpp() == 1) // Grayscale mode: convert palette to luminance
         {
             std::vector<uint8_t> raw{};
             if (!crx.unpack(raw))
@@ -121,7 +65,7 @@ namespace circusadv
 
             for (int y{}; y < h; ++y)
             {
-                void* scanline{ scanlinecallback(callbackdata, y) };
+                void* scanline{ context.scanlinecallback(y) };
                 if (scanline == nullptr)
                 {
                     break;
@@ -141,7 +85,7 @@ namespace circusadv
                     row_out[x] = static_cast<uint8_t>(luminance >> 8);
                 }
             }
-            scanlinecallback(callbackdata, -1);
+            context.scanlinecallback(-1);
             return;
         }
         else
@@ -151,7 +95,7 @@ namespace circusadv
             const uint8_t* src_data{};
             std::vector<uint8_t> pixels{};
 
-            if (!crx.decode(pixels, static_cast<uint8_t>(keyidx)))
+            if (!crx.decode(pixels, static_cast<uint8_t>(context.keyidx)))
             {
                 LOGD("CRX: failed to decode");
                 return;
@@ -162,14 +106,14 @@ namespace circusadv
 
             for (int y{}; y < h; ++y)
             {
-                void* scanline{ scanlinecallback(callbackdata, y) };
+                void* scanline{ context.scanlinecallback(y) };
                 if (scanline == nullptr)
                 {
                     break;
                 }
                 std::memcpy(scanline, src_data + static_cast<size_t>(y) * stride, w * 4);
             }
-            scanlinecallback(callbackdata, -1);
+            context.scanlinecallback(-1);
         }
 
     }
@@ -179,17 +123,31 @@ namespace circusadv
         if(kr2android::init(modbase))
         {
             logd("kr2android init success!\n");
-            auto TVPGraphicType = tTVPGraphicType::GetGlobal();
-            tTVPGraphicHandlerType crx
+            TVP::Graphic::HandlerType crx
             {
                 .IsPlugin      = false,
                 .Extension     = ".crx",
-                .LoadHandler   = TVPLoadCRX,
+                .LoadHandler   = TVP::Graphic::LoadingHandlerWrapper<TVPLoadCRX>::Call,
                 .HeaderHandler = nullptr,
                 .SaveHandler   = nullptr,
                 .AcceptHandler = nullptr,
             };
-            TVPGraphicType->Register(crx);
+
+            tvp::graphic::register_loading_handler(crx);
+
+            const ttstr* native_dir = tvp::project::get_native_dir();
+            const ttstr* project_dir = tvp::project::get_dir();
+            if(native_dir != nullptr)
+            {
+                auto&& _str = native_dir->AsStdString();
+                logd("native_dir: %s\n", _str.c_str());
+            }
+
+            if(project_dir != nullptr)
+            {
+                auto&& _str = project_dir->AsStdString();
+                logd("project_dir: %s\n", _str.c_str());
+            }
         }
         else
         {
