@@ -148,6 +148,19 @@ namespace circusadv
                 auto&& _str = project_dir->AsStdString();
                 logd("project_dir: %s\n", _str.c_str());
             }
+
+            auto&& app_path  = tvp::project::app_path();
+            auto&& game_path = tvp::project::game_path();
+            if(!app_path.IsEmpty())
+            {
+                auto&& _str = app_path.AsStdString();
+                logd("app_path: %s\n", _str.c_str());
+            }
+            if(!game_path.IsEmpty())
+            {
+                auto&& _str = game_path.AsStdString();
+                logd("game_path: %s\n", _str.c_str());
+            }
         }
         else
         {
