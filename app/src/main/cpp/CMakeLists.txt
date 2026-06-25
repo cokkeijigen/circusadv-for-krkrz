@@ -17,6 +17,23 @@ elseif(ANDROID_ABI STREQUAL "x86_64")
     set(VCPKG_TARGET_TRIPLET "x64-android" CACHE STRING "")
 endif()
 
+add_compile_options(
+        -O0
+        -g
+        -fno-inline
+        -fno-inline-functions
+        -fno-limit-debug-info
+)
+
+add_link_options(
+        "-Wl,--no-gc-sections"
+        "-Wl,-export-dynamic"
+        "-Wl,--discard-none"    # 👈 绝杀参数：强行禁止链接器丢弃任何局部符号（包括本地 static 符号）
+)
+
+# 3. 绝杀：强行将 NDK 默认的独立 Strip 动作重置为空
+set(CMAKE_STRIP "")
+
 # Explicitly enable C and CXX to ensure C_COMPILER is initialized
 project("circusadv" C CXX)
 
