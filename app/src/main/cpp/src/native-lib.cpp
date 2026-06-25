@@ -1,13 +1,32 @@
 #include <native-lib.hpp>
 #include <image_crx.hpp>
+#include <tjsObject.h>
+#include <tjs.h>
 
 namespace circusadv
 {
 
+    struct test_callback: tvp::events::continuous_callback, tvp::events::compact_callback
+    {
+        virtual void OnContinuousCallback(tjs_uint64 tick) override
+        {
+            logd("OnContinuousCallback -> %lu", tick);
+        }
+
+        virtual void OnCompact(Level level) override
+        {
+            logd("OnCompact -> %d", level);
+        }
+    };
+
+    static test_callback _test_callback{};
+
     static auto TVPLoadCRX(const TVP::Graphic::GraphicLoadingContext& context) noexcept -> void
     {
+        tvp::events::remove_continuous_hook(&_test_callback);
+
         std::vector<uint8_t> buffer{};
-        auto size = context.src->GetSize();
+        auto size = context.stream->GetSize();
         if(size ==0)
         {
             LOGD("无法获取文件大小");
@@ -116,12 +135,78 @@ namespace circusadv
             context.scanlinecallback(-1);
         }
 
+        auto ret0 = k2a::tvp::scripts::dump_engine(true);
+        logd("k2a::tvp::script::dump_engine(global) -> %s\n", ret0 ? "true": "false");
     }
 
-    extern "C" JNIEXPORT auto K2A_OnLoad(void* modbase, JavaVM*) -> void
+    static auto test() noexcept -> void
     {
-        if(kr2android::init(modbase))
+        tTJSVariant result{};
         {
+            logd("k2a::tvp::script::execute begin\n");
+            ttstr content = TJS_W("global.g_test_string = System.exePath;");
+            bool ret1{ k2a::tvp::scripts::execute(content, nullptr, &result) };
+            logd("k2a::tvp::script::execute -> %s\n", ret1 ? "true": "false");
+        }
+        {
+            logd("k2a::tvp::script::execexpr begin\n");
+            ttstr content = TJS_W("global.g_test_string");
+            bool ret2{ k2a::tvp::scripts::execexpr(content, nullptr, &result) };
+            logd("k2a::tvp::script::execexpr -> %s\n", ret2 ? "true": "false");
+        }
+
+        switch (result.Type()) {
+            case tvtVoid:
+            {
+                logd("result.Type = tvtVoid\n");
+                break;
+            }
+            case tvtObject:
+            {
+                logd("result.Type = tvtObject\n");
+                break;
+            }
+            case tvtString:
+            {
+                logd("result.Type = tvtString\n");
+                break;
+            }
+            case tvtOctet:
+            {
+                logd("result.Type = tvtOctet\n");
+                break;
+            }
+            case tvtInteger:
+            {
+                logd("result.Type = tvtInteger\n");
+                break;
+            }
+            case tvtReal:
+            {
+                logd("result.Type = tvtReal\n");
+                break;
+            }
+        }
+        logd("result.Type() = %d\n", result.Type());
+        if (result.Type() == tvtString)
+        {
+            ttstr exePathStr = result;
+            auto aaaa = exePathStr.AsStdString();
+            logd("global.g_test_string = %s\n", aaaa.c_str());
+        }
+        auto ret = k2a::tvp::scripts::dump_engine();
+        logd("k2a::tvp::script::dump_engine -> %s\n", ret ? "true": "false");
+    }
+
+
+
+    extern "C" JNIEXPORT auto K2A_OnLoad(const k2a::k2aplugin* k2a, JavaVM*) -> void
+    {
+        if(kr2android::plugin_init(k2a))
+        {
+            tvp::events::add_continuous_hook(&_test_callback);
+            tvp::events::add_compact_hook(&_test_callback);
+
             logd("kr2android init success!\n");
             TVP::Graphic::HandlerType crx
             {
@@ -135,30 +220,18 @@ namespace circusadv
 
             tvp::graphic::register_loading_handler(crx);
 
-            const ttstr* native_dir = tvp::project::get_native_dir();
-            const ttstr* project_dir = tvp::project::get_dir();
-            if(native_dir != nullptr)
-            {
-                auto&& _str = native_dir->AsStdString();
-                logd("native_dir: %s\n", _str.c_str());
-            }
+            test();
 
-            if(project_dir != nullptr)
-            {
-                auto&& _str = project_dir->AsStdString();
-                logd("project_dir: %s\n", _str.c_str());
-            }
-
-            auto&& app_path  = tvp::project::app_path();
-            auto&& game_path = tvp::project::game_path();
+            auto&& app_path  = tvp::system::app_path();
+            auto&& base_path = tvp::system::base_path();
             if(!app_path.IsEmpty())
             {
                 auto&& _str = app_path.AsStdString();
                 logd("app_path: %s\n", _str.c_str());
             }
-            if(!game_path.IsEmpty())
+            if(!base_path.IsEmpty())
             {
-                auto&& _str = game_path.AsStdString();
+                auto&& _str = base_path.AsStdString();
                 logd("game_path: %s\n", _str.c_str());
             }
         }
